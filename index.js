@@ -24,8 +24,8 @@ else {
 	// the packages start point.
 	var package = require('./package.json');
 
-	if (package.name && package.start) {
-		session.context[package.name] = require(path.join(cwd, package.start));
+	if (package.name && package.main) {
+		session.context[package.name] = require(path.join(cwd, package.main));
 	}
 	else {
 		// fail in a informative manner

@@ -1,6 +1,6 @@
 {
   "name": "rebelle",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Start a repl session with one of more given modules loaded.",
   "main": "index.js",
   "scripts": {},
