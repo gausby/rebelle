@@ -22,7 +22,7 @@ else {
 	// try to auto detect the current module from the package.json
 	// and initialize the session using the name of the package and
 	// the packages start point.
-	var package = require('./package.json');
+	var package = require(path.join(cwd, 'package.json'));
 
 	if (package.name && package.main) {
 		session.context[package.name] = require(path.join(cwd, package.main));
