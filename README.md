@@ -1,8 +1,8 @@
 # Rebelle
 
-A small tool that starts a repl with a given list of modules loaded. Use this to play around with a given node module in a read-eval-print-loop.
+A small tool that starts a repl session with a given list of modules loaded. Use this to play around with a given node module in a read-eval-print-loop.
 
-Example, standing in a node module:
+Example:
 
 ```sh
 $ rebelle --myModule lib/myModule.js
@@ -13,7 +13,7 @@ $ rebelle --myModule lib/myModule.js
 
 This is essentially the same as opening a repl using `node` and writing `myModule = require('./lib/myModule')`—one could argue that this is a tad more convenient, though (some would perhaps argue the opposite, and very passionately).
 
-If no arguments is given the module will try to locate a `package.json` file and boot that module up in a repl.
+An added benefit is that it will attempt to load the current node module if `rebelle` is executed within the folder structure of a node module. Also, if there is a `node_modules` folder in the current directory it will attempt to load them in and assign them to their package names.
 
 Oh yeah, alpha software. Pull requests are welcome.
 
