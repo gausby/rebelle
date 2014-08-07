@@ -1,7 +1,7 @@
 {
   "name": "rebelle",
   "version": "0.1.0",
-  "description": "Start a repl session with one of more given modules loaded.",
+  "description": "Start a repl with the current module, dependencies, and arbitrary files loaded",
   "main": "index.js",
   "scripts": {},
   "keywords": [
