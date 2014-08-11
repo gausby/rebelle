@@ -28,7 +28,7 @@ As the example shows, it will attempt to load the modules found in the `node_mod
 
 Extra javascript or JSON-files can be required into the session by using double dash arguments.
 
-``sh
+```sh
 $ rebelle /tmp/pursuit/package.json --hello /tmp/hello.js
 └─ global
    ├─ pursuit: pursuit@0.3.1
@@ -38,7 +38,7 @@ $ rebelle /tmp/pursuit/package.json --hello /tmp/hello.js
 
 cwd: /private/tmp/lodash/node_modules/pursuit
 >
-``
+```
 
 There is support for more than one file, so by all means: go nuts!
 
