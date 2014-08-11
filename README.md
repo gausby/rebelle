@@ -5,15 +5,42 @@ A small tool that starts a repl session with a given list of modules loaded. Use
 Example:
 
 ```sh
-$ rebelle --myModule lib/myModule.js
-> myModule
+$ cd /tmp
+$ npm install pursuit
+$ rebelle
+└─ global
+   └─ pursuit: pursuit@0.3.1
+
+cwd: /tmp/
+> pursuit
 [function]
->
 ```
 
-This is essentially the same as opening a repl using `node` and writing `myModule = require('./lib/myModule')`—one could argue that this is a tad more convenient, though (some would perhaps argue the opposite, and very passionately).
+As the example shows, it will attempt to load the modules found in the `node_modules` folder in the current directory. The loading strategy is as follows:
 
-An added benefit is that it will attempt to load the current node module if `rebelle` is executed within the folder structure of a node module. Also, if there is a `node_modules` folder in the current directory it will attempt to load them in and assign them to their package names.
+  1. if rebelle is started with a javascript file as the first argument (the file ends in `.js`), it will load this into the session and give it the basename of the file. `rebelle /tmp/hello.js` would result in a session with the content of `hello.js` loaded into `global.hello`.
+
+  2. if the first argument is a `package.json` file, it will attempt to load this package into the session and give it the name of the package. The dependencies will also be loaded in and the current working directory will be set to the path of the package.
+
+  3. if a folder is given as the first argument it will look for a `node_modules`-folder and load the packages within that folder into the session.
+
+  4. if no argument is given it will traverse the file-system upwards untill it finds a folder with a `package.json`-file or a `node_modules`-folder, and follow *2* for the former and *3* for the latter.
+
+Extra javascript or JSON-files can be required into the session by using double dash arguments.
+
+``sh
+$ rebelle /tmp/pursuit/package.json --hello /tmp/hello.js
+└─ global
+   ├─ pursuit: pursuit@0.3.1
+   ├─ pursuitCore: pursuit-core@0.0.1
+   ├─ pursuitDictionary: pursuit-dictionary@0.0.1
+   └─ hello: /tmp/hello.js
+
+cwd: /private/tmp/lodash/node_modules/pursuit
+>
+``
+
+There is support for more than one file, so by all means: go nuts!
 
 Oh yeah, alpha software. Pull requests are welcome.
 

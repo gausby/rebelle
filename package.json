@@ -1,17 +1,20 @@
 {
   "name": "rebelle",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Start a repl with the current module, dependencies, and arbitrary files loaded",
   "main": "index.js",
   "scripts": {},
   "keywords": [
-    "repl", "cli"
+    "repl",
+    "cli"
   ],
   "bin": "./index.js",
   "author": "Martin Gausby <martin@gausby.dk> (http://martin.gausby.dk/)",
   "license": "MIT",
   "dependencies": {
-    "minimist": "^0.2.0"
+    "minimist": "^0.2.0",
+    "treeify": "^1.0.1",
+    "case": "^1.0.3"
   },
   "repository": "git@github.com:gausby/rebelle.git",
   "bugs": {
