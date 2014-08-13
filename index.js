@@ -7,14 +7,24 @@ var treeify = require('treeify');
 var path = require('path');
 var fs = require('fs');
 var repl = require('repl');
+var util = require('util');
 
 var cwd = process.cwd();
 
 var requireList = [];
 
-initialize(argv._[0]);
+var session = repl.start({
+	prompt: '' // this will be set to settings.prompt later
+});
 
-function initialize(arg) {
+session.context.__errors = {};
+
+
+initialize(argv._[0], {
+	prompt: '> '
+});
+
+function initialize(arg, settings) {
 	var dir;
 
 	// initialized with js file
@@ -26,7 +36,7 @@ function initialize(arg) {
 			path: path.resolve(cwd, arg)
 		});
 
-		loadArbitraryModules();
+		registerArbitraryModules();
 	}
 	else {
 		// no arg, try to auto detect a module by traversing the file system upwards
@@ -44,28 +54,67 @@ function initialize(arg) {
 
 		process.chdir(dir);
 
-		loadModule(dir);
-		loadDependencies(dir);
-		loadArbitraryModules();
+		registerModule(dir);
+		registerDependencies(dir);
+		registerArbitraryModules();
 	}
 
 	// initialize the repl session with a message about what is being loaded
-	console.log(treeify.asTree(requireList.reduce(function (a, b) {
-		a.global[b.name] = b.version ? b.packageName+'@'+b.version : b.packageName;
+	var result = {success: 0, failure: 0};
+	var report = treeify.asTree(requireList.reduce(function (a, module) {
+		var status = loadModuleIntoSession(module);
+
+		a[module.name] = [
+			module.packageName,
+			module.version ? '@'+module.version : undefined,
+			status.loaded ? undefined : ' (FAILED)',
+			status.empty ? ' (empty)' : undefined
+		].join('');
+
+		result[status.loaded ? 'success' : 'failure'] += 1;
 
 		return a;
-	}, {global: {}}), true));
+	}, {}), true);
 
-	console.log('cwd:', process.cwd());
+	util.print([
+		report,
+		result.failure ? 'Some modules failed to load, type `__errors` for details' : undefined,
+		[result.success, 'file'+(result.success!==1?'s':''), 'loaded'].join(' '),
+		'cwd: ' + process.cwd(),
+		settings.prompt
+	].filter(Boolean).join('\n'));
 
-	var session = repl.start('> ');
-	requireList.forEach(function(module) {
-		session.context[module.name] = require(module.path);
-	});
+	session.prompt = settings.prompt;
 }
 
 
 // helper functions ------------------------------------------------
+function loadModuleIntoSession(module) {
+	var status = { loaded: true, empty: false }
+
+	try {
+		session.context[module.name] = require(module.path);
+		if (typeof session.context[module.name] === 'object') {
+			if (! Object.keys(session.context[module.name]).length) {
+				status.empty = true;
+			}
+		}
+	}
+	catch (err) {
+		session.context.__errors[module.name] = {
+			module: module.name,
+			version: module.version,
+			path: module.path,
+			type: err.name,
+			message: err.message,
+			stack: err.stack
+		};
+
+		status.loaded = false;
+	}
+
+	return status;
+}
 
 // normalizeName should translate spaces and dashes into camelCased
 // strings, unless it is a snake_cased string.
@@ -104,7 +153,7 @@ function resolvePackageDir(cwd) {
 
 
 // Include a module to the repl session
-function loadModule(packagePath) {
+function registerModule(packagePath) {
 	if (! hasPackageJson(packagePath)) {
 		return;
 	}
@@ -127,7 +176,7 @@ function dependencyBlacklist(current) {
 	return current !== '.bin';
 }
 
-function loadDependencies(packagePath) {
+function registerDependencies(packagePath) {
 	if (! hasNodeModulesDir(packagePath)) {
 		return;
 	}
@@ -135,7 +184,7 @@ function loadDependencies(packagePath) {
 	var node_modules = path.join(packagePath, 'node_modules');
 
 	fs.readdirSync(node_modules).filter(dependencyBlacklist).forEach(function(current) {
-		loadModule(path.join(node_modules, current));
+		registerModule(path.join(node_modules, current));
 	});
 }
 
@@ -145,7 +194,7 @@ function filterArgs(arg) {
 	return arg !== '_';
 }
 
-function loadArbitraryModules() {
+function registerArbitraryModules() {
 	Object.keys(argv).filter(filterArgs).forEach(function(current) {
 		var scriptPath = path.resolve(process.cwd(), argv[current]);
 		requireList.push({
