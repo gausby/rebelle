@@ -8,10 +8,10 @@ Example:
 $ cd /tmp
 $ npm install pursuit
 $ rebelle
-└─ global
-   └─ pursuit: pursuit@0.3.1
+└─ pursuit: pursuit@0.3.1
 
-cwd: /tmp/
+1 file loaded
+cwd: /private/tmp
 > pursuit
 [function]
 ```
@@ -29,20 +29,28 @@ As the example shows, it will attempt to load the modules found in the `node_mod
 Extra javascript or JSON-files can be required into the session by using double dash arguments.
 
 ```sh
-$ rebelle /tmp/pursuit/package.json --hello /tmp/hello.js
-└─ global
-   ├─ pursuit: pursuit@0.3.1
-   ├─ pursuitCore: pursuit-core@0.0.1
-   ├─ pursuitDictionary: pursuit-dictionary@0.0.1
-   └─ hello: /tmp/hello.js
+$ rebelle /tmp/node_modules/pursuit/package.json --hello /tmp/hello.js
+├─ pursuit: pursuit@0.3.1
+├─ pursuitCore: pursuit-core@0.0.1
+├─ pursuitDictionary: pursuit-dictionary@0.0.1
+└─ hello: /tmp/hello.js
 
-cwd: /private/tmp/lodash/node_modules/pursuit
+4 files loaded
+cwd: /private/tmp/node_modules/pursuit
 >
 ```
 
 There is support for more than one file, so by all means: go nuts!
 
 Oh yeah, alpha software. Pull requests are welcome.
+
+
+## (FAILED) aka loading a module that throws an error
+If a module require results in an error being thrown, it will get indicated by the label **(FAILED)** in the require report printed during initialization. A report about what happened can be found in the error object, bound to `__errors`.
+
+
+## (empty) aka loading a file that did not export anything
+If a file did not export anything rebelle will put the label **(empty)** after its name in the initialization report.
 
 
 ## Installation
