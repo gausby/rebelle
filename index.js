@@ -12,13 +12,9 @@ var util = require('util');
 var cwd = process.cwd();
 
 var requireList = [];
-
-var session = repl.start({
-	prompt: '' // this will be set to settings.prompt later
-});
-
-session.context.__errors = {};
-
+var sessionContext = {
+	__errors: {}
+};
 
 initialize(argv._[0], {
 	prompt: '> '
@@ -62,7 +58,7 @@ function initialize(arg, settings) {
 	// initialize the repl session with a message about what is being loaded
 	var result = {success: 0, failure: 0};
 	var report = treeify.asTree(requireList.reduce(function (a, module) {
-		var status = loadModuleIntoSession(module);
+		var status = loadModule(module);
 
 		a[module.name] = [
 			module.packageName,
@@ -80,28 +76,32 @@ function initialize(arg, settings) {
 		report,
 		result.failure ? 'Some modules failed to load, type `__errors` for details' : undefined,
 		[result.success, 'file'+(result.success!==1?'s':''), 'loaded'].join(' '),
-		'cwd: ' + process.cwd(),
-		settings.prompt
+		'cwd: ' + process.cwd()
 	].filter(Boolean).join('\n'));
 
-	session.prompt = settings.prompt;
+	// start repl as the last thing to avoid prompt glitches
+	// on the initial prompt line when typing backspace
+	var session = repl.start(settings);
+	Object.keys(sessionContext).forEach(function(current) {
+		session.context[current] = sessionContext[current];
+	});
 }
 
 
 // helper functions ------------------------------------------------
-function loadModuleIntoSession(module) {
-	var status = { loaded: true, empty: false }
+function loadModule(module) {
+	var status = { loaded: true, empty: false };
 
 	try {
-		session.context[module.name] = require(module.path);
-		if (typeof session.context[module.name] === 'object') {
-			if (! Object.keys(session.context[module.name]).length) {
+		sessionContext[module.name] = require(module.path);
+		if (typeof sessionContext[module.name] === 'object') {
+			if (! Object.keys(sessionContext[module.name]).length) {
 				status.empty = true;
 			}
 		}
 	}
 	catch (err) {
-		session.context.__errors[module.name] = {
+		sessionContext.__errors[module.name] = {
 			module: module.name,
 			version: module.version,
 			path: module.path,
