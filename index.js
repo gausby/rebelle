@@ -11,16 +11,19 @@ var util = require('util');
 
 var cwd = process.cwd();
 
-var requireList = [];
-var sessionContext = {
-	__errors: {}
-};
-
-initialize(argv._[0], {
+var settings = {
 	prompt: '> '
-});
+}
 
-function initialize(arg, settings) {
+var requireList = [];
+var session = repl.start({
+	prompt: ''
+});
+session.context.__errors = {}
+
+initialize(argv._[0]);
+
+function initialize(arg) {
 	var dir;
 
 	// initialized with js file
@@ -72,36 +75,46 @@ function initialize(arg, settings) {
 		return a;
 	}, {}), true);
 
-	util.print([
+	print(
 		report,
 		result.failure ? 'Some modules failed to load, type `__errors` for details' : undefined,
 		[result.success, 'file'+(result.success!==1?'s':''), 'loaded'].join(' '),
 		'cwd: ' + process.cwd()
-	].filter(Boolean).join('\n'));
-
-	// start repl as the last thing to avoid prompt glitches
-	// on the initial prompt line when typing backspace
-	var session = repl.start(settings);
-	Object.keys(sessionContext).forEach(function(current) {
-		session.context[current] = sessionContext[current];
-	});
+	);
 }
 
 
 // helper functions ------------------------------------------------
+function print() {
+	var message = Array.prototype.slice.call(arguments);
+	message = message.filter(Boolean).join('\n');
+
+	if (! message) {
+		// do not interrupt the user
+		return;
+	}
+
+	session.prompt = '';
+	session.displayPrompt();
+	session.outputStream.write(message + '\n');
+
+	session.prompt = settings.prompt;
+	session.displayPrompt();
+}
+
 function loadModule(module) {
 	var status = { loaded: true, empty: false };
 
 	try {
-		sessionContext[module.name] = require(module.path);
-		if (typeof sessionContext[module.name] === 'object') {
-			if (! Object.keys(sessionContext[module.name]).length) {
+		session.context[module.name] = require(module.path);
+		if (typeof session.context[module.name] === 'object') {
+			if (! Object.keys(session.context[module.name]).length) {
 				status.empty = true;
 			}
 		}
 	}
 	catch (err) {
-		sessionContext.__errors[module.name] = {
+		session.context.__errors[module.name] = {
 			module: module.name,
 			version: module.version,
 			path: module.path,
