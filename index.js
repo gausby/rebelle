@@ -8,6 +8,7 @@ var path = require('path');
 var fs = require('fs');
 var repl = require('repl');
 var util = require('util');
+var chokidar = require('chokidar');
 
 var cwd = process.cwd();
 
@@ -106,18 +107,20 @@ function loadModule(module) {
 	var status = { loaded: true, empty: false };
 
 	try {
-		session.context[module.name] = require(module.path);
+		session.context[module.name] = require(module.main || module.path);
 		if (typeof session.context[module.name] === 'object') {
 			if (! Object.keys(session.context[module.name]).length) {
 				status.empty = true;
 			}
 		}
+		delete session.context.__errors[module.name];
 	}
 	catch (err) {
 		session.context.__errors[module.name] = {
 			module: module.name,
 			version: module.version,
 			path: module.path,
+			main: module.main,
 			type: err.name,
 			message: err.message,
 			stack: err.stack
@@ -126,7 +129,28 @@ function loadModule(module) {
 		status.loaded = false;
 	}
 
+	registerFileWatcher(module);
+
 	return status;
+}
+
+function registerFileWatcher(module) {
+	var observer = chokidar.watch(module.path, { persistent: true });
+	observer.on('change', function() {
+		observer.close();
+
+		delete require.cache[require.resolve(module.main||module.path)];
+		var result = loadModule(module);
+
+		var message = [
+			module.name, 'reload:', (result.loaded ? 'success' : 'failure'),
+			(result.empty ? '(empty)': undefined)
+		];
+		print(
+			message.filter(Boolean).join(' '),
+			(! result.loaded ? session.context.__errors[module.name].stack : undefined)
+		);
+	});
 }
 
 // normalizeName should translate spaces and dashes into camelCased
@@ -178,7 +202,8 @@ function registerModule(packagePath) {
 	requireList.push({
 		name: normalizeName(package.name),
 		packageName: package.name,
-		path: path.join(packagePath, package.main),
+		path: packagePath,
+		main: path.join(packagePath, package.main),
 		version: package.version
 	});
 }
