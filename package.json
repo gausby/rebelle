@@ -12,10 +12,10 @@
   "author": "Martin Gausby <martin@gausby.dk> (http://martin.gausby.dk/)",
   "license": "MIT",
   "dependencies": {
-    "case": "^1.0.3",
-    "minimist": "^0.2.0",
-    "pathwatcher": "^2.0.9",
-    "treeify": "^1.0.1"
+    "case": "1.0.3",
+    "chokidar": "0.8.4",
+    "minimist": "0.2.0",
+    "treeify": "1.0.1"
   },
   "repository": "git@github.com:gausby/rebelle.git",
   "bugs": {

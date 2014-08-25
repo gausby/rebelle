@@ -53,6 +53,10 @@ If a module require results in an error being thrown, it will get indicated by t
 If a file did not export anything rebelle will put the label **(empty)** after its name in the initialization report.
 
 
+## Live code reloading
+Rebelle will attempt to reload the loaded modules, and files, as they change on disk. This is an experimental feature that will most likely end in a scarcely documented configuration option, perhaps disabled by default.
+
+
 ## Installation
 Install it using `npm install rebelle -g`. A command line tool called `rebelle` should be available upon installation. Remove it again using `npm uninstall rebelle -g`.
 

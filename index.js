@@ -8,7 +8,7 @@ var path = require('path');
 var fs = require('fs');
 var repl = require('repl');
 var util = require('util');
-var pathwatcher = require('pathwatcher');
+var chokidar = require('chokidar');
 
 var cwd = process.cwd();
 
@@ -129,12 +129,19 @@ function loadModule(module) {
 		status.loaded = false;
 	}
 
-	var observer = pathwatcher.watch(module.path, function() {
+	registerFileWatcher(module);
+
+	return status;
+}
+
+function registerFileWatcher(module) {
+	var observer = chokidar.watch(module.path, { persistent: true });
+	observer.on('change', function() {
 		observer.close();
 
 		delete require.cache[require.resolve(module.main||module.path)];
-
 		var result = loadModule(module);
+
 		var message = [
 			module.name, 'reload:', (result.loaded ? 'success' : 'failure'),
 			(result.empty ? '(empty)': undefined)
@@ -144,8 +151,6 @@ function loadModule(module) {
 			(! result.loaded ? session.context.__errors[module.name].stack : undefined)
 		);
 	});
-
-	return status;
 }
 
 // normalizeName should translate spaces and dashes into camelCased
