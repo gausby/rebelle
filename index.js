@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-/*global process */
+/*global global process */
 var argv = require('minimist')(process.argv.slice(2));
 var Case = require('case');
 var treeify = require('treeify');
@@ -10,23 +10,25 @@ var repl = require('repl');
 var util = require('util');
 var chokidar = require('chokidar');
 
+var homedir = process.env[(process.platform == 'win32') ? 'USERPROFILE' : 'HOME'];
+
 var cwd = process.cwd();
-
-var settings = {
-	prompt: '> '
-}
-
 var requireList = [];
-var session = repl.start({
-	prompt: ''
-});
-session.context.__errors = {}
+var session = repl.start({});
+session.context.__errors = {};
+
+// default rebelle configuration
+session.rebelle = {
+	'code-reload': true
+};
+
+// register some helper functions globally to make them accessible from rc files
+global.print = print;
+
 
 initialize(argv._[0]);
 
 function initialize(arg) {
-	var dir;
-
 	// initialized with js file
 	if(path.extname(arg) === '.js' && fs.existsSync(arg) && fs.statSync(arg).isFile()) {
 		// attach node module to session
@@ -39,6 +41,7 @@ function initialize(arg) {
 		registerArbitraryModules();
 	}
 	else {
+		var dir;
 		// no arg, try to auto detect a module by traversing the file system upwards
 		if (! arg) {
 			dir = resolvePackageDir(cwd);
@@ -53,11 +56,14 @@ function initialize(arg) {
 		}
 
 		process.chdir(dir);
+		loadRunCommandsFile(dir);
 
 		registerModule(dir);
 		registerDependencies(dir);
 		registerArbitraryModules();
 	}
+
+	loadRunCommandsFile(homedir);
 
 	// initialize the repl session with a message about what is being loaded
 	var result = {success: 0, failure: 0};
@@ -95,11 +101,12 @@ function print() {
 		return;
 	}
 
+	var prompt = session.prompt;
 	session.prompt = '';
 	session.displayPrompt();
 	session.outputStream.write(message + '\n');
 
-	session.prompt = settings.prompt;
+	session.prompt = prompt;
 	session.displayPrompt();
 }
 
@@ -129,7 +136,9 @@ function loadModule(module) {
 		status.loaded = false;
 	}
 
-	registerFileWatcher(module);
+	if (session.rebelle['code-reload']) {
+		registerFileWatcher(module);
+	}
 
 	return status;
 }
@@ -138,6 +147,11 @@ function registerFileWatcher(module) {
 	var observer = chokidar.watch(module.path, { persistent: true });
 	observer.on('change', function() {
 		observer.close();
+
+		// bail out if the `code-reload` setting has changed during the session
+		if (! session.rebelle['code-reload']) {
+			return;
+		}
 
 		delete require.cache[require.resolve(module.main||module.path)];
 		var result = loadModule(module);
@@ -151,6 +165,20 @@ function registerFileWatcher(module) {
 			(! result.loaded ? session.context.__errors[module.name].stack : undefined)
 		);
 	});
+}
+
+function loadRunCommandsFile(dir) {
+	var file = path.join(dir, '.rebellerc.js');
+	if (fs.existsSync(file) && fs.statSync(file).isFile()) {
+		try {
+			require(file)(session);
+			return true;
+		}
+		catch(err) {
+			print('Error: ' + file, err.stack);
+		}
+	}
+	return false;
 }
 
 // normalizeName should translate spaces and dashes into camelCased
