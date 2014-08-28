@@ -56,6 +56,29 @@ If a file did not export anything rebelle will put the label **(empty)** after i
 ## Live code reloading
 Rebelle will attempt to reload the loaded modules, and files, as they change on disk. This is an experimental feature that will most likely end in a scarcely documented configuration option, perhaps disabled by default.
 
+## ~/rebellerc.js
+You can add functionality to your rebelle session by adding a *rebellerc.js* file to your home directory or project root. The file should contain a CommonJS module that exports a function, which will get executed before rebelle loads packages into the session. The first parameter is the repl session, so you can basically do anything here:
+```js
+// file: ~/.rebellerc.js
+module.exports = function(session) {
+    // ignore undefined return statements
+    session.ignoreUndefined = false;
+
+    // add a .hello-command
+    session.commands['.hello'] = {
+        help : 'Show the hello, world! message',
+        action : function() {
+            print('Hello, world!');
+        }
+    };
+
+    // add something to the session context
+    session.context.something = 'something';
+
+    // change the prompt to a $ sign
+    session.prompt = '$ ';
+}
+```
 
 ## Installation
 Install it using `npm install rebelle -g`. A command line tool called `rebelle` should be available upon installation. Remove it again using `npm uninstall rebelle -g`.
