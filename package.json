@@ -1,6 +1,6 @@
 {
   "name": "rebelle",
-  "version": "0.4.0",
+  "version": "1.0.0",
   "description": "Start a repl with the current module, dependencies, and arbitrary files loaded",
   "main": "index.js",
   "scripts": {},
