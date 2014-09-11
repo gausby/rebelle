@@ -1,34 +1,133 @@
 #!/usr/bin/env node
 
 /*global global process */
-var argv = require('minimist')(process.argv.slice(2));
+var fs = require('fs');
+var path = require('path');
+var util = require('util');
+var repl = require('repl');
+
 var Case = require('case');
 var treeify = require('treeify');
-var path = require('path');
-var fs = require('fs');
-var repl = require('repl');
-var util = require('util');
-var chokidar = require('chokidar');
+var operandi = require('operandi');
+var prise = require('prise');
+var argv = require('minimist')(process.argv.slice(2));
 
-var homedir = process.env[(process.platform == 'win32') ? 'USERPROFILE' : 'HOME'];
 
-var cwd = process.cwd();
-var requireList = [];
+// start repl session
 var session = repl.start({});
 session.context.__errors = {};
 
+
 // default rebelle configuration
 session.rebelle = {
-	'code-reload': true
+	ignoreRCFiles: false,
+	ignoreRCFileInHome: false,
+	ignoreRCFileInProjects: true
 };
+
+var homedir = process.env[(process.platform == 'win32') ? 'USERPROFILE' : 'HOME'];
+var cwd = process.cwd();
+var requireList = []; // store packages that will get required into the session
 
 // register some helper functions globally to make them accessible from rc files
 global.print = print;
 
+operandi.serial([
+	loadRebelleUserSettings,
+	initializeRebellePlugins,
+	handleCommandLineArgument,
+	initializeRCFiles
+], initializationResult);
 
-initialize(argv._[0]);
 
-function initialize(arg) {
+function initializationResult(err) {
+	if (err) {
+		console.error(err);
+		process.exit(1);
+	}
+
+	// output a message about what has been loaded into the session
+	var result = {success: 0, failure: 0};
+	var report = treeify.asTree(requireList.reduce(function (a, module) {
+		var status = loadModule(module);
+
+		a[module.name] = [
+			module.packageName,
+			module.version ? '@'+module.version : undefined,
+			status.loaded ? undefined : ' (FAILED)',
+			status.empty ? ' (empty)' : undefined
+		].join('');
+
+		result[status.loaded ? 'success' : 'failure'] += 1;
+
+		return a;
+	}, {}), true);
+
+	print(
+		report,
+		result.failure ? 'Some modules failed to load, type `__errors` for details' : undefined,
+		[result.success, 'file'+(result.success!==1?'s':''), 'loaded'].join(' '),
+		'cwd: ' + process.cwd()
+	);
+
+	session.emit('initialized');
+}
+
+
+function loadRebelleUserSettings(done) {
+	var package = { main: 'index.js' }; // default to index.js
+
+	var userDir = path.resolve(homedir, '.rebelle');
+	if (hasPackageJson(userDir)) {
+		package = require(path.join(userDir, 'package.json'));
+		package.main = package.main || 'index.js';
+	}
+
+	var mainFile = path.resolve(userDir, package.main);
+	if (fs.existsSync(mainFile) && fs.statSync(mainFile).isFile()) {
+		try {
+			require(path.resolve(userDir, package.main))(session);
+		} catch(err) {
+			done(err);
+		};
+	}
+
+	done();
+}
+
+
+function initializeRebellePlugins(done) {
+	var userDir = path.resolve(homedir, '.rebelle');
+
+	if (! hasNodeModulesDir(userDir)) {
+		// no plugin dir, move along!
+		return done();
+	}
+
+	prise(path.resolve(userDir, 'node_modules'), 'rebelle-', function(err, plugins) {
+		if (err) {
+			return done(err);
+		}
+
+		plugins.forEach(function(plugin) {
+			try {
+				require(plugin.main)(session);
+			}
+			catch(err) {
+				err.plugin = plugin.name;
+				if (err.message === 'object is not a function') {
+					err.hint = 'Plugins should export a function';
+				}
+				done(err);
+			}
+		});
+		done();
+	});
+}
+
+
+function handleCommandLineArgument(done) {
+	var arg = argv._[0]
 	// initialized with js file
 	if(path.extname(arg) === '.js' && fs.existsSync(arg) && fs.statSync(arg).isFile()) {
 		// attach node module to session
@@ -56,38 +155,48 @@ function initialize(arg) {
 		}
 
 		process.chdir(dir);
-		loadRunCommandsFile(dir);
 
 		registerModule(dir);
 		registerDependencies(dir);
 		registerArbitraryModules();
 	}
 
-	loadRunCommandsFile(homedir);
+	done();
+}
 
-	// initialize the repl session with a message about what is being loaded
-	var result = {success: 0, failure: 0};
-	var report = treeify.asTree(requireList.reduce(function (a, module) {
-		var status = loadModule(module);
 
-		a[module.name] = [
-			module.packageName,
-			module.version ? '@'+module.version : undefined,
-			status.loaded ? undefined : ' (FAILED)',
-			status.empty ? ' (empty)' : undefined
-		].join('');
+function initializeRCFiles(done) {
+	if (! session.rebelle.ignoreRCFiles) {
+		// find and load rc file in the user home dir
+		if (! session.rebelle.ignoreRCFileInHome) {
+			loadRunCommandsFile(homedir);
+		}
 
-		result[status.loaded ? 'success' : 'failure'] += 1;
+		// find and load rc file in project dir
+		if (! session.rebelle.ignoreRCFileInProjects) {
+			loadRunCommandsFile(process.cwd());
+		}
+	}
 
-		return a;
-	}, {}), true);
+	function loadRunCommandsFile(dir) {
+		var file = path.join(dir, '.rebellerc.js');
+		if (fs.existsSync(file) && fs.statSync(file).isFile()) {
+			try {
+				require(file)(session);
+				return true;
+			}
+			catch(err) {
+				err.file = file;
+				if (err.message === 'object is not a function') {
+					err.hint = 'Plugins should export a function';
+				}
+				done(err);
+			}
+		}
+		return false;
+	}
 
-	print(
-		report,
-		result.failure ? 'Some modules failed to load, type `__errors` for details' : undefined,
-		[result.success, 'file'+(result.success!==1?'s':''), 'loaded'].join(' '),
-		'cwd: ' + process.cwd()
-	);
+	done();
 }
 
 
@@ -110,17 +219,33 @@ function print() {
 	session.displayPrompt();
 }
 
+
+function hasPackageJson(dir) {
+	var packageJson = path.join(dir, 'package.json');
+	return fs.existsSync(packageJson) && fs.statSync(packageJson).isFile();
+}
+
+
+function hasNodeModulesDir(dir) {
+	var node_modules = path.join(dir, 'node_modules');
+	return fs.existsSync(node_modules) && fs.statSync(node_modules).isDirectory();
+}
+
+
 function loadModule(module) {
 	var status = { loaded: true, empty: false };
-
 	try {
 		session.context[module.name] = require(module.main || module.path);
+
 		if (typeof session.context[module.name] === 'object') {
 			if (! Object.keys(session.context[module.name]).length) {
 				status.empty = true;
 			}
 		}
+
 		delete session.context.__errors[module.name];
+
+		session.emit('require:success', module);
 	}
 	catch (err) {
 		session.context.__errors[module.name] = {
@@ -134,52 +259,13 @@ function loadModule(module) {
 		};
 
 		status.loaded = false;
-	}
 
-	if (session.rebelle['code-reload']) {
-		registerFileWatcher(module);
+		session.emit('require:failure', module);
 	}
 
 	return status;
 }
 
-function registerFileWatcher(module) {
-	var observer = chokidar.watch(module.path, { persistent: true });
-	observer.on('change', function() {
-		observer.close();
-
-		// bail out if the `code-reload` setting has changed during the session
-		if (! session.rebelle['code-reload']) {
-			return;
-		}
-
-		delete require.cache[require.resolve(module.main||module.path)];
-		var result = loadModule(module);
-
-		var message = [
-			module.name, 'reload:', (result.loaded ? 'success' : 'failure'),
-			(result.empty ? '(empty)': undefined)
-		];
-		print(
-			message.filter(Boolean).join(' '),
-			(! result.loaded ? session.context.__errors[module.name].stack : undefined)
-		);
-	});
-}
-
-function loadRunCommandsFile(dir) {
-	var file = path.join(dir, '.rebellerc.js');
-	if (fs.existsSync(file) && fs.statSync(file).isFile()) {
-		try {
-			require(file)(session);
-			return true;
-		}
-		catch(err) {
-			print('Error: ' + file, err.stack);
-		}
-	}
-	return false;
-}
 
 // normalizeName should translate spaces and dashes into camelCased
 // strings, unless it is a snake_cased string.
@@ -188,16 +274,6 @@ function normalizeName(input) {
 		return 'Case';
 	}
 	return Case.of(input) === 'snake' ? input : Case.camel(input);
-}
-
-function hasPackageJson(dir) {
-	var packageJson = path.join(dir, 'package.json');
-	return fs.existsSync(packageJson) && fs.statSync(packageJson).isFile();
-}
-
-function hasNodeModulesDir(dir) {
-	var node_modules = path.join(dir, 'node_modules');
-	return fs.existsSync(node_modules) && fs.statSync(node_modules).isDirectory();
 }
 
 

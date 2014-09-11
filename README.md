@@ -53,11 +53,18 @@ If a module require results in an error being thrown, it will get indicated by t
 If a file did not export anything rebelle will put the label **(empty)** after its name in the initialization report.
 
 
-## Live code reloading
-Rebelle will attempt to reload the loaded modules, and files, as they change on disk. This is an experimental feature that will most likely end in a scarcely documented configuration option, perhaps disabled by default.
+## Extending Rebelle
+Rebelle supports extensions in the form of rc files and plugins.
 
-## ~/rebellerc.js
-You can add functionality to your rebelle session by adding a *rebellerc.js* file to your home directory or project root. The file should contain a CommonJS module that exports a function, which will get executed before rebelle loads packages into the session. The first parameter is the repl session, so you can basically do anything here:
+
+### User settings (~/.rebelle/)
+Todo, write more about this.
+
+If you install node modules that starts with `rebelle-` into *node_modules*-folder in *~/.rebelle/*, they will get picked up and loaded when rebelle initializes. A rebelle plugin is a normal CommonJS file that exports a function. This function receives the repl session as its first argument.
+
+
+### ~/.rebellerc.js (and /path/to/project/.rebellerc.js if enabled in configuration)
+You can add functionality to your rebelle session by adding a *.rebellerc.js* file to your home directory or project root. The file should contain a CommonJS module that exports a function, which will get executed before rebelle loads packages into the session. The first parameter is the repl session, so you can basically do anything here:
 ```js
 // file: ~/.rebellerc.js
 module.exports = function(session) {
@@ -79,6 +86,23 @@ module.exports = function(session) {
     session.prompt = '$ ';
 }
 ```
+
+You can disable these files by setting `session.rebelle.ignoreRCFiles` to `true`; default is `false`. Further more you can choose to load rc files located in the root of the current project (disabled by default); and choose to ignore the rc file in your home directory.
+
+  * `session.rebelle.ignoreRCFiles`, default `false`
+  * `session.rebelle.ignoreRCFileInHome`, default `false`
+  * `session.rebelle.ignoreRCFileInProjects`, default `true`
+
+
+### Rebelle events
+The `session` is a event emitter that emit the following:
+
+  * `initialized` when everything has been loaded and Rebelle is ready for user input. Receives nothing.
+  * `require:success` when rebelle succeed to load a node module into the session. Receives the module.
+  * `require:failure` when rebelle fails to load a node module into the session. Receives the module.
+
+Feel free to add your own event emitters on your plugins.
+
 
 ## Installation
 Install it using `npm install rebelle -g`. A command line tool called `rebelle` should be available upon installation. Remove it again using `npm uninstall rebelle -g`.
